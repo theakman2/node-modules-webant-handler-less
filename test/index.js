@@ -1,94 +1,57 @@
+var fs = require("fs");
+var path = require("path");
+
 var Handler = require("../lib/index.js");
-var HandlerBase = require("./lib/Handler.js");
-
-function createHandler(Handler,settings) {
-	var handlerBase = new HandlerBase(settings);
-	
-	Handler.prototype = handlerBase;
-	Handler.prototype.constructor = Handler;
-	
-	return new Handler();
-}
-
-var lessApi = require("less");
 
 var tests = {
-	"test less 1":function(assert,done) {
-		var handler = createHandler(Handler);
-		var data = {
-			filePath:"https://sfi9s.sdf.sd/vk93k.handlebars?bla=3",
-			raw:"https://sfi9s.sdf.sd/vk93k.handlebars?bla=3",
-			requireType:"comment"
-		};
-		handler.willHandle(data,function(err,yes){
-			assert.strictEqual(err,null,"Handler should not report any errors.");
-			assert.strictEqual(yes,false,"Handler should not claim to handle this file.");
-			done();
-		});
+	"test filetypes":function(assert) {
+		var handler = new Handler();
+		var data = [
+		            "https://mysite.co.uk/bla.js",
+		            "//cdn.google.com/path/to/assets.css",
+		            "path/to/assets.less",
+		            "/abs/path/to/assets.less",
+		            "@@hbs/runtime",
+		            "@@css/addStylesheet"
+		            ];
+		assert.deepEqual(
+			data.map(handler.willHandle),
+			[false,false,true,true,false,true],
+			"Should handle the correct files."
+		);
 	},
-	"test less 2":function(assert,done) {
-		var handler = createHandler(Handler);
-		var data = {
-			filePath:__dirname+"/path/to/bad/file.css",
-			raw:"file.css",
-			requireType:"function"
-		};
-		handler.willHandle(data,function(err,yes){
-			assert.strictEqual(err,null,"Handler should not report any errors.");
-			assert.strictEqual(yes,false,"Handler should not claim to handle this file.");
-			done();
-		});
-	},
-	"test less correct file type":function(assert,done) {		
-		var handler = createHandler(Handler);
-		var data = {
-			filePath:__dirname+"/styles.less",
-			requireType:"comment"
-		};
-		handler.handle(data,function(resp){
-			assert.deepEqual(
-				resp,
-				{
-					type:"internalCss",
-					content:".foo .bar {\n  color: #eeccdd;\n}"
-				},
-				"Handler should call 'update' correctly."
+	"test content 1":function(assert,done) {		
+		var handler = new Handler();
+		handler.handle(__dirname+"/styles.less",function(err,content){
+			assert.ok(!err,"There should be no errors handling this filetype.");
+			assert.equal(
+				content,
+				'require("@@css/addStylesheet",function(add){ add(".foo .bar {\\n  color: #eeccdd;\\n}"); });',
+				"Handler should return the right content."
 			);
 			done();
 		});
 	},
-	"test less correct file type with compression (2)":function(assert,done) {
-		var handler = createHandler(Handler,{compress:true});
-		var data = {
-			filePath:__dirname+"/styles.less",
-			requireType:"comment"
-		};
-		handler.handle(data,function(resp){
-			assert.deepEqual(
-				resp,
-				{
-					type:"internalCss",
-					content:".foo .bar{color:#ecd}"
-				},
-				"Handler should call 'update' correctly."
+	"test content 2":function(assert,done) {
+		var handler = new Handler({compress:true});
+		handler.handle(__dirname+"/styles.less",function(err,content){
+			assert.ok(!err,"There should be no errors handling this filetype.");
+			assert.equal(
+				content,
+				'require("@@css/addStylesheet",function(add){ add(".foo .bar{color:#ecd}"); });',
+				"Handler should return the right content."
 			);
 			done();
 		});
 	},
-	"test less correct file type with compression and as javascript":function(assert,done) {		
-		var handler = createHandler(Handler,{compress:true});
-		var data = {
-			filePath:__dirname+"/styles.less",
-			requireType:"function"
-		};
-		handler.handle(data,function(resp){
-			assert.deepEqual(
-				resp,
-				{
-					type:"internalJs",
-					content:'require("@@css/addStylesheet")(".foo .bar{color:#ecd}");'
-				},
-				"Handler should call 'update' correctly."
+	"test content 3":function(assert,done) {		
+		var handler = new Handler({compress:true});
+		handler.handle("@@css/addStylesheet",function(err,content){
+			assert.ok(!err,"There should be no errors handling this filetype.");
+			assert.equal(
+				content,
+				fs.readFileSync(path.join(__dirname,"..","lib","data","addStylesheet.js")).toString(),
+				"Handler should update with correct content."
 			);
 			done();
 		});
